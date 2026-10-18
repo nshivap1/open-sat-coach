@@ -8,6 +8,7 @@ import { updateResponse } from '../../domain/attempts';
 import { startPracticeAttempt, saveAttempt, finishPractice, getAttempt, gradedFor, markRemembered, reportProblem } from '../../domain/actions';
 import { ItemView } from '../test/ItemView';
 import { RichText } from '../../components/RichText';
+import { CoachPanel } from '../ai/CoachPanel';
 import './practice.css';
 
 type Stage = { kind: 'pick' } | { kind: 'lesson'; skillId: string } | { kind: 'session'; attemptId: string; skillId: string; note?: string } | { kind: 'done'; attemptId: string; skillId: string };
@@ -179,6 +180,7 @@ function Session({ attemptId, note, onDone }: { attemptId: string; note?: string
           <strong>{result.outcome === 'correct' ? '✓ Correct' : result.outcome === 'omitted' ? '— Skipped' : result.outcome === 'invalid_format' ? '! Answer format' : '✗ Not quite'}</strong>
           {result.formatMessage ? <p>{result.formatMessage}</p> : null}
           <Explanation itemId={item.id} chosen={chosen} />
+          <CoachPanel item={item} chosen={resp?.raw} />
         </div>
       ) : null}
       <div className="row">

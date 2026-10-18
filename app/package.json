@@ -3,11 +3,16 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Open SAT Coach — web build of the core study loop (desktop shell, local model and PDF import come next).",
+  "description": "Open SAT Coach \u2014 offline SAT study app (web build + Tauri desktop shell). The AI coach connects to a local model installation.",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:desktop": "node scripts/build.mjs --desktop",
     "typecheck": "tsc --noEmit -p .",
-    "test": "node --import tsx --test \"src/**/*.test.ts\""
+    "test": "node scripts/test.mjs",
+    "tauri": "tauri",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build",
+    "check:private": "node scripts/check-no-private.mjs"
   },
   "dependencies": {
     "react": "19.2.8",
@@ -16,6 +21,10 @@
   "devDependencies": {
     "esbuild": "0.28.2",
     "tsx": "4.23.12",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "@tauri-apps/cli": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=20.6"
   }
 }

@@ -28,6 +28,7 @@ Companion files: [SOURCE_REVIEW.md](SOURCE_REVIEW.md) (source inventory and seed
 | D-11 | Coach = **hint ladder + explanation + up to 6 follow-up turns anchored to the current item** | Keeps every answer tied to a verifiable item; no open-ended chatbot |
 | D-12 | **Gemma 4** family (E2B / E4B / 12B) is the model candidate set | Google lists Gemma 4 under Apache-2.0 [S6]; verify the selected artifact's license file and per-variant image support |
 | D-13 | A **form budget planner** allocates the eight official forms among Bluebook tests, in-app diagnostics, and practice | Stops students from burning fresh full tests on drills |
+| D-14 | **The model is not bundled (owner decision, Oct 18).** The app connects to any local installation (Ollama, LM Studio, a llama.cpp server, Jan, another OpenAI-compatible server on this machine, or a `.gguf` file it runs with llama-server) and onboarding links to Gemma downloads | Gemma 4 E4B Q4_0 is 4.59 GB, over GitHub's 2 GiB per-file release limit; AI stays optional, local, and loopback-only |
 
 **Removed from v1.0:** digital-format rehearsal (v1 FR-02 P1), local adaptive routing and its 70% threshold, the "reserve at least two forms" rule (replaced by D-13), all human/teacher reviewer gates.
 
@@ -47,7 +48,7 @@ The **ontological map** is a versioned network connecting official SAT domains a
 2. Simulate test conditions for official paper forms in the app. Send students to Bluebook for official adaptive tests and record those results. Never call a paper replay "the digital SAT."
 3. Save every attempt. Map mistakes to skills without treating one mistake as proof of a misconception.
 4. Run tutoring and quiz generation on a bundled local model (Gemma 4 candidate, chosen by evaluation).
-5. Ship one self-contained download per supported OS/architecture, including the default model and runtime.
+5. Ship one download per supported OS/architecture that works fully offline without AI; the AI coach uses a local model installation the student already has or downloads from links in onboarding (D-14). A model-bundled edition is optional later distribution.
 6. Accept questions across the SAT curriculum and give evidence-backed solutions with an explicit verification status, not guaranteed correctness.
 7. Offer a quiet, simple interface with light, dark, and system themes.
 8. Show the student's skill map — what each skill tests, where they stand, and why something is recommended — as a primary view.
@@ -338,7 +339,7 @@ Recommend a daily session with a visible reason, such as "You missed 3 of 5 rece
 
 ### FR-08 — Local AI runtime
 
-**P0.** Bundle a local inference runtime and a pinned quantized instruction model. **Candidates (D-12): Gemma 4 E4B** (default candidate), **E2B** (low-memory fallback), **12B** (quality candidate if it fits size and latency budgets). Google's release notes list Gemma 4 with an Apache-2.0 license [S6]; confirm the selected artifact's license file. Third-party listings disagree on which Gemma 4 variants accept images; verify per variant. If the default lacks image input, image questions use local OCR plus mandatory transcription confirmation.
+**P0 (revised by D-14).** Do not bundle the model. Detect and connect to a local installation: Ollama (`127.0.0.1:11434`), LM Studio (`:1234`), llama.cpp server (`:8080`), Jan (`:1337`), a custom loopback URL, or (desktop) a `.gguf` file found in common folders or chosen by the student, run by an app-managed `llama-server` on 127.0.0.1 with a per-launch token. All requests go to loopback addresses only; the desktop app proxies them through Rust. Onboarding offers download links (Ollama `gemma4:e4b`, LM Studio, the Hugging Face GGUF) with a memory-based recommendation, plus "Check again" and "Skip". An in-app benchmark on original items reports accuracy, coverage, and latency for the connected model. **Candidates (D-12): Gemma 4 E4B** (default candidate), **E2B** (low-memory fallback), **12B** (quality candidate if it fits size and latency budgets). Google's release notes list Gemma 4 with an Apache-2.0 license [S6]; confirm the selected artifact's license file. Third-party listings disagree on which Gemma 4 variants accept images; verify per variant. If the default lacks image input, image questions use local OCR plus mandatory transcription confirmation.
 
 **Size constraint:** GitHub release assets are limited to 2 GiB per file [S10]. A single installer above that needs another download host (owner action O-4) or a smaller model/quantization. Measure installer size per candidate in the model spike.
 
@@ -406,7 +407,7 @@ Light/dark/system theme with a persistent setting, keyboard navigation, visible 
 
 ### FR-12 — Distribution, privacy, and portability
 
-**P0.** One self-contained installer per platform (macOS Apple Silicon, Windows x64) containing the application, runtime, default model, original content, math rendering, and offline calculator. An installer that downloads the required model on first use does not meet this requirement.
+**P0 (revised by D-14).** One installer per platform (macOS Apple Silicon, Windows x64) containing the application, original content, math rendering, and offline calculator; everything except the AI coach works offline from first launch. The model is obtained separately (FR-08). Bundling `llama-server` as a sidecar for `.gguf` files is allowed; bundling model weights is a later, optional edition hosted outside GitHub Releases (O-4).
 
 - **macOS:** signed with Developer ID and notarized; a `.pkg` (or equivalent) installs the app and places the model payload outside the app bundle so app-only updates do not carry it.
 - **Windows:** signed installer (NSIS/MSI) that bundles the **WebView2 runtime for offline installation** and installs the model payload to the app-data area.
@@ -626,7 +627,7 @@ Each milestone delivers a working user flow, automated checks, and a short recor
 | Milestone | Scope | Demo script | Exit criteria |
 |---|---|---|---|
 | **M0 web prototype** (exists) | React web build at `app/`: ontology seed (8 domains, 29 skills), original items and lessons, original quick diagnostic, test engine (timed modules, flags, elimination, review grid, module lock), deterministic grading, evidence model, recommendations, skill map + list, practice sessions with hints/explanations, Bluebook log, form budget | Open the build → onboard → take the diagnostic → see results by skill → open the map → start recommended practice → log a Bluebook test and see the form budget update | Builds offline; unit tests pass for grading, evidence, ranking; core flow keyboard-usable |
-| **M1 Desktop foundation** | Tauri 2 shell around the M0 UI; SQLite repository replacing local storage; migrations; ADRs; license inventory; private-data ignore rules; CI on macOS and Windows | Install dev build, create profile, quit/relaunch, data persists | Repository tests; CI green on both platforms |
+| **M1 Desktop foundation** | Tauri 2 shell around the M0 UI; SQLite repository replacing local storage; migrations; ADRs; license inventory; private-data ignore rules; CI on macOS and Windows; local-model detection and connection (D-14), onboarding download links, "explain it another way" with anchored follow-ups, in-app model benchmark | Install dev build, create profile, quit/relaunch, data persists | Repository tests; CI green on both platforms |
 | **M2 Official content slice** | PDFium extraction; Test 10 manifest; generic pipeline; per-block render + text layer + Text view; in-app paper replay and paper answer entry; range scoring; official explanations | Drop the Test 10 bundle → form activates → take Module 1 → results with range → open official explanation | Digest verification passes; conversion table verified row by row; fake-clock timer suite passes |
 | **M3 All forms + Question Bank** | Manifests for forms 4–11; Question Bank export parser; dedup and exposure across sources; maintainer tooling (preview, optional override; never a gate) | Import all eight bundles and a 100-item Question Bank export → import report clean | All eight forms activate with zero manual steps; QB tags preserved; no leaks of reserved items |
 | **M4 Original content at scale** | Build-time content pipeline; 29 lessons; ≥20 original items per skill; review records; problem reports | Browse any skill → lesson → original practice with "reviewed by automated checks" basis | Rubric gate ≥90%; every item has a ReviewRecord |
@@ -647,7 +648,7 @@ These cannot be done by a coding agent. None blocks M0; each is needed by the mi
 | O-1 | Choose a product name without "SAT" (College Board trademark); tagline "a study coach for the SAT®" plus non-affiliation disclaimer | Before the public repo is announced | Keep "Open SAT Coach" as an internal codename only |
 | O-2 | Apple Developer Program membership (Developer ID Application + Installer certificates, notarization) | M7 | Required for macOS distribution |
 | O-3 | Windows code signing (e.g., Azure Trusted Signing or an OV/EV certificate) | M7 | Required to avoid SmartScreen blocks |
-| O-4 | Download host if the installer exceeds GitHub's 2 GiB per-asset limit | After the M5 model spike | Prefer a model/quantization that fits; otherwise a host such as Hugging Face or object storage with published checksums |
+| O-4 | Download host for an optional model-bundled edition (the default installer no longer carries the model, D-14) | Only if a bundled edition is wanted | A host such as Hugging Face or object storage with published checksums |
 | O-5 | Content license for original lessons and items | M4 | CC BY 4.0 (code stays Apache-2.0) |
 | O-6 | Build-time AI budget and API keys for the content pipeline (maintainer-owned, never shipped) | M3–M4 | Modest; measure in M4 |
 | O-7 | GitHub organization/repository, security contact, issue template for sanitized problem reports | M1 | — |

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useAppState, setState, emptyState } from '../../domain/store';
+import { ModelSetup } from '../ai/ModelSetup';
+import { BenchmarkPanel } from '../ai/BenchmarkPanel';
 import { switchProfile, deleteProfile, exportProfileJson, updateProfile } from '../../domain/actions';
 
 export function Settings({ onAddProfile }: { onAddProfile(): void }) {
@@ -38,6 +40,11 @@ export function Settings({ onAddProfile }: { onAddProfile(): void }) {
           <p className="muted">Your goal is used for planning only. The app does not predict SAT scores.</p>
         </section>
       ) : null}
+      <section className="card stack" aria-labelledby="set-ai-h">
+        <h2 id="set-ai-h" style={{ margin: 0 }}>AI coach</h2>
+        <ModelSetup variant="settings" />
+        {s.ai?.enabled && s.ai.provider ? <BenchmarkPanel /> : null}
+      </section>
       <section className="card stack">
         <h2 style={{ margin: 0 }}>Profiles</h2>
         {s.profiles.map((p) => (
@@ -56,8 +63,8 @@ export function Settings({ onAddProfile }: { onAddProfile(): void }) {
       </section>
       <section className="card stack">
         <h2 style={{ margin: 0 }}>Privacy and about</h2>
-        <p>All data stays in this browser on this device. There is no account, telemetry, or network request.</p>
-        <p className="muted">This is the web build of Open SAT Coach: original practice questions, test engine, grading, skill map, practice and planning. The desktop app adds importing your official College Board practice PDFs, the local AI coach, and an offline graphing calculator. Original questions and explanations were checked by automated review, not by a human teacher. SAT® is a trademark registered by the College Board, which is not affiliated with and does not endorse this product.</p>
+        <p>All data stays on this device. There is no account or telemetry, and the app makes no internet requests. The optional AI coach talks only to a model running on this computer.</p>
+        <p className="muted">Open SAT Coach includes original practice questions, a test engine, grading, a skill map, practice and planning. The desktop app keeps your data in a local database and can run downloaded model files directly. Still to come: importing your official College Board practice PDFs and an offline graphing calculator. Original questions and explanations were checked by automated review, not by a human teacher. SAT® is a trademark registered by the College Board, which is not affiliated with and does not endorse this product.</p>
         {confirmId === '__all__'
           ? <div className="row"><button className="btn" style={{ color: 'var(--bad)' }} onClick={() => { setState(() => emptyState()); setConfirmId(null); }}>Yes, erase every profile and all history</button><button className="btn" onClick={() => setConfirmId(null)}>Cancel</button></div>
           : <button className="btn" style={{ alignSelf: 'flex-start', color: 'var(--bad)' }} onClick={() => setConfirmId('__all__')}>Erase all data…</button>}

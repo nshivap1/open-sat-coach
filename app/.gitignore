@@ -2,3 +2,9 @@ node_modules/
 dist/*.png
 dist/app.js
 dist/app.css
+dist-desktop/
+src-tauri/target/
+src-tauri/gen/
+*.gguf
+*.pdf
+*.zip

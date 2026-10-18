@@ -31,7 +31,8 @@ function useTheme() {
 export function App() {
   useTheme();
   const profile = useAppState((s) => activeProfile(s));
-  const [view, setView] = useState<View>({ name: 'home' });
+  // Start in onboarding when there is no profile, so its optional AI step stays visible after the profile is created.
+  const [view, setView] = useState<View>(() => (activeProfile() ? { name: 'home' } : { name: 'onboarding' }));
   const go = (name: 'home' | 'practice' | 'tests' | 'progress') => setView(name === 'practice' ? { name, key: Date.now() } : ({ name } as View));
   const practice = (skillId: string) => setView({ name: 'practice', skillId, key: Date.now() });
   const openTest = (testId: string) => { const id = startTest(testId); if (id) setView({ name: 'test', attemptId: id }); };

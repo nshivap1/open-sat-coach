@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Attempt, GradedResponse, MissReason, ResponseRecord } from '../../domain/types';
 import { DOMAIN_BY_ID, ITEM_BY_ID, SKILL_BY_ID } from '../../content';
 import { ItemView } from './ItemView';
+import { CoachPanel } from '../ai/CoachPanel';
 import './test.css';
 
 const REASONS: MissReason[] = ['concept', 'misread', 'calculation', 'strategy', 'time', 'guessed', 'unsure'];
@@ -90,6 +91,7 @@ export function Results({ attempt, graded, missReasons, onSetMissReason, onPract
                         {why && <p><strong>Why {chosen} is wrong:</strong> {why}</p>}
                         <p><strong>Takeaway:</strong> {item.explanation.takeaway}</p>
                       </div>
+                      <CoachPanel item={item} chosen={resp?.raw ?? null} />
                       {g.outcome !== 'correct' && (
                         <div className="t-chips" role="group" aria-label="Why did you miss this?">
                           <span className="t-muted">Why did you miss this?</span>

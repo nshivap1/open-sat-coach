@@ -234,8 +234,11 @@ export interface Settings {
   reduceMotion: boolean;
 }
 
+import type { AiSettings } from '../ai/types';
+
 export interface AppState {
   schemaVersion: 1;
+  ai?: AiSettings;                                   // optional local model connection
   profiles: Profile[];
   activeProfileId: string | null;
   attempts: Attempt[];
