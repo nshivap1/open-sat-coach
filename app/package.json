@@ -1,0 +1,21 @@
+{
+  "name": "open-sat-coach",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Open SAT Coach — web build of the core study loop (desktop shell, local model and PDF import come next).",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "node --import tsx --test \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "tsx": "4.23.12",
+    "typescript": "6.0.3"
+  }
+}

@@ -1,0 +1,4 @@
+node_modules/
+dist/*.png
+dist/app.js
+dist/app.css
