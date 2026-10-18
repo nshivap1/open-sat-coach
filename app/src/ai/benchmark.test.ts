@@ -84,3 +84,41 @@ test('unparseable or invalid answers count as not answered; limit and abort retu
   const partial = await runBenchmark(P, many, { signal: ctrl.signal, onProgress: (d) => { if (d === 2) ctrl.abort(); } });
   assert.equal(partial.items, 2);
 });
+
+test('judgeExplanations: the coach explains the key for the first answered items and the judge sets explanationPassRate', async () => {
+  const items = ITEMS.filter((i) => i.response.kind === 'mcq').slice(0, 4);
+  const J: ProviderConfig = { ...P, model: 'judge-model', label: 'llama.cpp · judge-model' };
+  let idx = -1;
+  let judgeCalls = 0;
+  const explained: string[] = [];
+  g.fetch = async (_u: string, init: any) => {
+    const body = JSON.parse(init.body);
+    const props = body.response_format?.json_schema.schema.properties ?? {};
+    let content: string;
+    if (props.verdict) {
+      judgeCalls++;
+      assert.equal(body.model, 'judge-model');
+      assert.equal(body.temperature, 0);
+      const ok = judgeCalls !== 2; // the second judged explanation fails
+      content = JSON.stringify({ independentWork: 'Solved.', judgeAnswer: null, answerCorrect: ok, reasoningSound: ok, grounded: true, issues: ok ? [] : ['Step 2 does not follow.'], verdict: ok ? 'pass' : 'fail' });
+    } else if (props.text) {
+      const item = items.find((i) => body.messages[1].content.includes(i.passage ?? i.prompt))!;
+      explained.push(item.id);
+      content = JSON.stringify({ text: 'Here is another way to see it.', steps: ['Read the question.'] });
+    } else {
+      idx++;
+      const item = items[idx];
+      content = JSON.stringify({ answer: idx === 0 ? 'Z' : (item.response as any).answer }); // first item unanswered
+    }
+    return new Response(JSON.stringify({ choices: [{ message: { content } }] }));
+  };
+  const r = await runBenchmark(P, items, { judgeExplanations: true, judge: J, judgeLimit: 2 });
+  assert.equal(r.answered, 3);
+  assert.deepEqual(explained, [items[1].id, items[2].id]);
+  assert.equal(judgeCalls, 2);
+  assert.equal(r.explanationPassRate, 0.5);
+  // Off by default.
+  idx = -1;
+  const r2 = await runBenchmark(P, items);
+  assert.equal(r2.explanationPassRate, undefined);
+});

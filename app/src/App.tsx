@@ -9,11 +9,12 @@ import { Settings } from './features/settings/Settings';
 import { Onboarding } from './features/onboarding/Onboarding';
 import { TestRunner } from './features/test/TestRunner';
 import { Results } from './features/test/Results';
+import { AskCoachPage } from './features/ai/AskCoachPage';
 import './app.css';
 
 type View =
   | { name: 'home' } | { name: 'practice'; skillId?: string; key: number } | { name: 'tests' } | { name: 'progress' }
-  | { name: 'settings' } | { name: 'onboarding' } | { name: 'test'; attemptId: string } | { name: 'results'; attemptId: string };
+  | { name: 'settings' } | { name: 'onboarding' } | { name: 'test'; attemptId: string } | { name: 'results'; attemptId: string } | { name: 'ask' };
 
 const NAV: { name: 'home' | 'practice' | 'tests' | 'progress'; label: string }[] = [
   { name: 'home', label: 'Home' }, { name: 'practice', label: 'Practice' }, { name: 'tests', label: 'Tests' }, { name: 'progress', label: 'Progress' },
@@ -55,14 +56,16 @@ export function App() {
           ))}
         </nav>
         <span style={{ flex: 1 }} />
+        <button className={`app-nav ${view.name === 'ask' ? 'active' : ''}`} aria-current={view.name === 'ask' ? 'page' : undefined} onClick={() => setView({ name: 'ask' })}>Ask the coach</button>
         <button className={`app-nav ${view.name === 'settings' ? 'active' : ''}`} onClick={() => setView({ name: 'settings' })} aria-label={`Settings — profile ${profile.nickname}`}>⚙ {profile.nickname}</button>
       </header>
       <main className="app-main">
-        {view.name === 'home' && <Home onPractice={practice} onStartTest={openTest} onResume={openResume} onGo={go} />}
+        {view.name === 'home' && <Home onPractice={practice} onStartTest={openTest} onResume={openResume} onGo={go} onAsk={() => setView({ name: 'ask' })} />}
         {view.name === 'practice' && <PracticePage key={view.key} initialSkillId={view.skillId} onOpenProgress={() => go('progress')} />}
         {view.name === 'tests' && <TestsPage onStartTest={openTest} onResume={openResume} />}
         {view.name === 'progress' && <ProgressPage onPractice={practice} />}
         {view.name === 'settings' && <Settings onAddProfile={() => setView({ name: 'onboarding' })} />}
+        {view.name === 'ask' && <AskCoachPage onPracticeSkill={practice} onBack={() => go('home')} />}
         {view.name === 'results' && <ResultsScreen attemptId={view.attemptId} onPractice={practice} onDone={() => go('progress')} />}
       </main>
       <footer className="app-footer muted">Offline web build · data stays in this browser · SAT® is a trademark of the College Board, which is not affiliated with this app.</footer>

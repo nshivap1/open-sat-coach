@@ -39,6 +39,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": ["binaries/*"],
     "category": "Education",
     "shortDescription": "Offline SAT practice with an optional local AI coach",
     "longDescription": "Open SAT Coach is an offline SAT practice app. Your progress stays on this computer, and the optional AI coach runs on a local model (llama.cpp, Ollama or LM Studio).",

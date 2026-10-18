@@ -94,6 +94,28 @@ fn log_tail(path: &Path) -> String {
     format!("\n\nLast lines of {}:\n{}", path.display(), lines[start..].join("\n"))
 }
 
+/// The variable the OS loader uses to find shared libraries for the child process.
+fn library_path_var() -> &'static str {
+    if cfg!(windows) {
+        "PATH"
+    } else if cfg!(target_os = "macos") {
+        "DYLD_LIBRARY_PATH"
+    } else {
+        "LD_LIBRARY_PATH"
+    }
+}
+
+/// Puts `dir` first in the child's `var` (keeping any existing entries after it).
+fn prepend_search_path(cmd: &mut Command, var: &str, dir: &Path) {
+    let mut entries: Vec<PathBuf> = vec![dir.to_path_buf()];
+    if let Some(existing) = std::env::var_os(var) {
+        entries.extend(std::env::split_paths(&existing).filter(|p| !p.as_os_str().is_empty()));
+    }
+    if let Ok(joined) = std::env::join_paths(entries) {
+        cmd.env(var, joined);
+    }
+}
+
 fn health_ok(agent: &ureq::Agent, port: u16, token: &str) -> bool {
     let url = format!("http://127.0.0.1:{port}/health");
     match agent
@@ -158,8 +180,9 @@ fn start_blocking(
         .stdout(Stdio::from(log_out))
         .stderr(Stdio::from(log_err));
     if let Some(dir) = binary.parent() {
-        // Lets a bundled llama-server find its shared libraries next to it.
+        // Lets a bundled llama-server find its shared libraries (.dylib/.so/.dll) next to it.
         cmd.current_dir(dir);
+        prepend_search_path(&mut cmd, library_path_var(), dir);
     }
     device::hide_console(&mut cmd);
 

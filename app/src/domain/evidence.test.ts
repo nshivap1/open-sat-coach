@@ -70,3 +70,20 @@ test('due reviews and spaced intervals', () => {
   assert.equal(nextReview(r, false, 'p1', SK, 0).intervalDays, 1);
   assert.equal(nextReview(r, false, 'p1', SK, 0).dueAt, DAY);
 });
+
+test('Gemma-generated questions are recorded but never count toward skill estimates (FR-10)', () => {
+  const genItems = { 'gen.x.1': { id: 'gen.x.1', skillId: SK, difficulty: 'medium', origin: 'generated' } as Item, it1: { ...items.it1, origin: 'original' } as Item };
+  const g: GradedResponse[] = [
+    { itemId: 'gen.x.1', skillId: SK, outcome: 'correct', assisted: false },
+    { itemId: 'it1', skillId: SK, outcome: 'correct', assisted: false },
+  ];
+  const o = observationsFromAttempt(attempt, g, genItems, [], [], 5);
+  assert.equal(o[0].origin, 'generated');
+  assert.equal(o[1].origin, 'original');
+  assert.equal(isEligible(o[0]), false);
+  assert.equal(isEligible(o[1]), true);
+  // An item missing from the map (e.g. dropped from storage) is still recognized by its id prefix.
+  assert.equal(observationsFromAttempt(attempt, g, {}, [], [], 5)[0].origin, 'generated');
+  const ev = computeSkillEvidence([...o, obs(9, true, { origin: 'generated', itemId: 'gen.y' })], 'p1', [], 10);
+  assert.equal(ev[SK].eligible, 1);
+});

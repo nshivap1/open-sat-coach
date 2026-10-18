@@ -1,6 +1,6 @@
-import { setState, useAppState } from '../../domain/store';
-import type { AiSettings, BenchmarkSummary, DetectionReport, ProviderConfig } from '../../ai/types';
-import { ensureRunning } from '../../ai';
+import { getState, setState, useAppState } from '../../domain/store';
+import type { AiSettings, BenchmarkSummary, DetectionReport, JudgeSettings, ProviderConfig } from '../../ai/types';
+import { ensureRunning, resolveJudge } from '../../ai';
 
 // Persist the chosen local model. The per-launch apiKey is never written to storage.
 export function saveProvider(p: ProviderConfig): void {
@@ -41,7 +41,46 @@ export async function readyProvider(p: ProviderConfig): Promise<ProviderConfig> 
   return started;
 }
 
-export function forgetRunning(): void { running = null; }
+export function forgetRunning(): void { running = null; runningJudge = null; }
+
+// ---- AI judge settings ----
+export const DEFAULT_JUDGE: JudgeSettings = { enabled: true, autoRepair: true };
+
+export function useJudgeSettings(): JudgeSettings {
+  const j = useAppState((s) => s.ai?.judge);
+  return { ...DEFAULT_JUDGE, ...(j ?? {}) };
+}
+
+// Persist judge settings. A judge provider's per-launch apiKey is never written to storage.
+export function saveJudgeSettings(patch: Partial<JudgeSettings>): void {
+  setState((s) => {
+    const next: JudgeSettings = { ...DEFAULT_JUDGE, ...(s.ai?.judge ?? {}), ...patch };
+    if ('provider' in patch && !patch.provider) delete next.provider;
+    if (next.provider) { const { apiKey: _drop, ...rest } = next.provider; next.provider = rest; }
+    return { ...s, ai: { ...(s.ai ?? { enabled: true }), judge: next } };
+  });
+}
+
+// Started copy of a separate judge model, kept apart from the coach's so neither evicts the other.
+let runningJudge: { key: string; p: ProviderConfig } | null = null;
+
+/** The judge for a started coach: null provider when the judge is off. Same-model judging reuses the coach. */
+export async function readyJudge(coachLive: ProviderConfig): Promise<{ provider: ProviderConfig | null; sameModel: boolean; label: string }> {
+  const settings: JudgeSettings = { ...DEFAULT_JUDGE, ...(getState().ai?.judge ?? {}) };
+  let chosen = settings;
+  // The app-managed llama-server runs one model file at a time: a second file can't judge alongside the coach's file.
+  if (settings.provider?.kind === 'gguf_file' && coachLive.kind === 'gguf_file' && (settings.provider.filePath ?? settings.provider.model) !== (coachLive.filePath ?? coachLive.model)) {
+    chosen = { ...settings, provider: undefined };
+  }
+  const r = resolveJudge(coachLive, chosen);
+  if (!r.provider) return { provider: null, sameModel: r.sameModel, label: r.label };
+  if (r.sameModel) return { provider: coachLive, sameModel: true, label: r.label };
+  const key = keyOf(r.provider);
+  if (runningJudge && runningJudge.key === key) return { provider: runningJudge.p, sameModel: false, label: r.label };
+  const started = await ensureRunning(r.provider);
+  runningJudge = { key, p: started };
+  return { provider: started, sameModel: false, label: r.label };
+}
 
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 

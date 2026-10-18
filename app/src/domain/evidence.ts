@@ -23,6 +23,7 @@ export function observationsFromAttempt(
   for (const g of graded) {
     const item = itemById[g.itemId];
     const hadPrior = seen.has(g.itemId);
+    const origin = item?.origin ?? (g.itemId.startsWith('gen.') ? 'generated' : undefined);
     out.push({
       profileId: attempt.profileId,
       itemId: g.itemId,
@@ -35,15 +36,17 @@ export function observationsFromAttempt(
       at: now,
       attemptId: attempt.id,
       mode: attempt.mode,
+      ...(origin ? { origin } : {}),
     });
     seen.add(g.itemId); // the same item twice in one attempt counts once
   }
   return out;
 }
 
-/** Fresh, unassisted, answered first attempts are concept evidence; everything else is just recorded. */
+/** Fresh, unassisted, answered first attempts are concept evidence; everything else is just recorded.
+ *  Gemma-written questions (origin 'generated') never count toward skill estimates (FR-10). */
 export function isEligible(o: Observation): boolean {
-  return o.firstAttempt && !o.assisted
+  return o.origin !== 'generated' && o.firstAttempt && !o.assisted
     && (o.exposureBefore === 'unseen' || o.exposureBefore === 'possibly_seen')
     && (o.outcome === 'correct' || o.outcome === 'incorrect');
 }

@@ -61,3 +61,52 @@
 .ai-stats dd:nth-of-type(1) { font-size: 1.35rem; font-weight: 700; }
 
 .ai-onb-step { display: flex; flex-direction: column; gap: .75rem; }
+
+/* One-click "Get Gemma" (desktop) */
+.ai-gg { display: flex; flex-direction: column; gap: .75rem; border: 2px solid var(--accent); box-shadow: none; }
+.ai-gg h3 { font-size: 1.15rem; }
+.ai-eyebrow { font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
+.ai-gg-label { font-weight: 600; }
+.ai-model.ai-locked { cursor: not-allowed; opacity: .75; }
+.ai-model.ai-locked:hover { background: var(--surface); }
+.ai-model.ai-on.ai-locked:hover { background: var(--accent-soft); }
+.ai-note { display: flex; flex-direction: column; gap: .4rem; padding: .6rem .8rem; border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 0 8px 8px 0; background: var(--surface-2); }
+.ai-note-warn { display: block; border-left-color: var(--warn); }
+.ai-gg-progress { display: flex; flex-direction: column; gap: .5rem; }
+.ai-bar { height: .9rem; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.ai-bar-fill { display: block; height: 100%; min-width: 2px; background: var(--accent); transition: width .4s ease; }
+@media (prefers-reduced-motion: reduce) { .ai-bar-fill { transition: none; } }
+.ai-gg-actions { gap: .4rem; }
+.ai-link { background: none; border: 0; padding: .25rem .35rem; font: inherit; font-size: .875rem; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.ai-link:hover { color: var(--bad); }
+.ai-link:disabled { cursor: not-allowed; opacity: .6; }
+.ai-gg-error { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.ai-gg-live { display: flex; gap: .5rem; align-items: center; }
+.ai-section-h { font-size: 1.05rem; margin-top: .5rem; }
+
+/* Gemma-written practice questions (FR-10) */
+.gen-opt { gap: .35rem; }
+.gen-check { gap: .5rem; cursor: pointer; }
+.gen-note { margin: 0; font-size: .875rem; }
+.gen-badge { align-self: flex-start; color: var(--accent); border-color: currentColor; background: var(--accent-soft); }
+
+/* AI judge: verdict badges and answer-checking settings. Meaning is carried by symbols and text, not color alone. */
+.jd-badge { display: flex; flex-direction: column; gap: .25rem; margin: 0 0 .5rem; padding: .5rem .75rem; border: 1px solid var(--border); border-left: 4px solid var(--muted); border-radius: 0 8px 8px 0; background: var(--surface-2); font-size: .9rem; }
+.jd-head { font-weight: 600; }
+.jd-who { font-size: .78rem; color: var(--muted); }
+.jd-pass { border-left-color: var(--ok); }
+.jd-pass .jd-head { color: var(--ok); }
+.jd-fail { border-left-color: var(--bad); }
+.jd-fail .jd-head { color: var(--bad); }
+.jd-uncertain { border-left-color: var(--warn); }
+.jd-off .jd-head { font-weight: 500; color: var(--muted); }
+.jd-busy { flex-direction: row; align-items: center; gap: .4rem; }
+.jd-issues, .jd-checks { margin: .15rem 0 0; padding-left: 1.2rem; }
+.jd-issues li, .jd-checks li { margin: .1rem 0; }
+.jd-details summary, .jd-hidden summary { cursor: pointer; font-size: .82rem; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.jd-hidden { margin-top: .35rem; }
+.jd-hidden[open] > summary { margin-bottom: .4rem; }
+.jd-steer { padding: .4rem .6rem; border-radius: 6px; background: var(--accent-soft); font-size: .9rem; }
+.jd-conflict { padding: .6rem .8rem; border: 2px solid var(--bad); border-radius: 8px; background: var(--surface-2); }
+.jd-settings { padding-top: .75rem; border-top: 1px solid var(--border); }
+.jd-bench { margin-top: .5rem; }

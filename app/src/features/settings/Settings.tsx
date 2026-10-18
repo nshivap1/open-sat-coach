@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAppState, setState, emptyState } from '../../domain/store';
 import { ModelSetup } from '../ai/ModelSetup';
 import { BenchmarkPanel } from '../ai/BenchmarkPanel';
+import { JudgeSettings } from '../ai/JudgeSettings';
 import { switchProfile, deleteProfile, exportProfileJson, updateProfile } from '../../domain/actions';
 
 export function Settings({ onAddProfile }: { onAddProfile(): void }) {
@@ -43,6 +44,7 @@ export function Settings({ onAddProfile }: { onAddProfile(): void }) {
       <section className="card stack" aria-labelledby="set-ai-h">
         <h2 id="set-ai-h" style={{ margin: 0 }}>AI coach</h2>
         <ModelSetup variant="settings" />
+        {s.ai?.enabled && s.ai.provider ? <JudgeSettings /> : null}
         {s.ai?.enabled && s.ai.provider ? <BenchmarkPanel /> : null}
       </section>
       <section className="card stack">

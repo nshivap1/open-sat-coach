@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { Attempt, ChoiceId, TestSpec } from '../../domain/types';
+import type { GenerationProgress } from '../../ai/types';
 import { useAppState, activeProfile } from '../../domain/store';
-import { DOMAINS, SKILLS, SKILL_BY_ID, LESSON_BY_SKILL, ITEM_BY_ID, itemsForSkill } from '../../content';
+import { DOMAINS, SKILLS, SKILL_BY_ID, LESSON_BY_SKILL, ITEMS, ITEM_BY_ID, itemsForSkill } from '../../content';
 import { composeSession } from '../../domain/recommend';
 import { gradeItem } from '../../domain/grading';
 import { updateResponse } from '../../domain/attempts';
@@ -9,6 +10,9 @@ import { startPracticeAttempt, saveAttempt, finishPractice, getAttempt, gradedFo
 import { ItemView } from '../test/ItemView';
 import { RichText } from '../../components/RichText';
 import { CoachPanel } from '../ai/CoachPanel';
+import { useAiProvider, readyProvider, errorText } from '../ai/aiState';
+import { generatePracticeItems } from '../../ai/generate';
+import { saveGenerated } from '../../content/registry';
 import './practice.css';
 
 type Stage = { kind: 'pick' } | { kind: 'lesson'; skillId: string } | { kind: 'session'; attemptId: string; skillId: string; note?: string } | { kind: 'done'; attemptId: string; skillId: string };
@@ -17,18 +21,22 @@ export function PracticePage({ initialSkillId, onOpenProgress }: { initialSkillI
   const [stage, setStage] = useState<Stage>(initialSkillId ? { kind: 'lesson', skillId: initialSkillId } : { kind: 'pick' });
   const [length, setLength] = useState(10);
 
-  const begin = (skillId: string) => {
+  const begin = (skillId: string, generatedIds: string[] = [], genNote?: string) => {
     const profileId = activeProfile()?.id;
     const seen = new Set<string>();
     const practiced = new Set<string>();
     for (const o of useAppStateSnapshot().observations) if (o.profileId === profileId) { seen.add(o.itemId); if (o.skillId !== skillId) practiced.add(o.skillId); }
-    const { itemIds, note } = composeSession(skillId, { seenItemIds: seen, length, practicedSkillIds: [...practiced] });
+    // Curated sessions draw only from original questions; Gemma-written ones are added explicitly up front.
+    const composed = composeSession(skillId, { seenItemIds: seen, length, practicedSkillIds: [...practiced], items: ITEMS.filter((i) => i.origin !== 'generated') });
+    const gen = generatedIds.filter((id) => ITEM_BY_ID[id]);
+    const itemIds = [...gen, ...composed.itemIds.filter((id) => !gen.includes(id))].slice(0, length + gen.length);
+    const note = [genNote, composed.note].filter(Boolean).join(' ') || undefined;
     if (itemIds.length === 0) return;
     const test: TestSpec = {
       id: `practice|${skillId}|${Date.now()}`,
       title: `Practice · ${SKILL_BY_ID[skillId]?.studentName ?? skillId}`,
       mode: 'practice',
-      label: 'Skill practice · original questions',
+      label: gen.length ? 'Skill practice · original questions + questions written by Gemma' : 'Skill practice · original questions',
       description: '',
       modules: [{ id: 'practice', section: SKILL_BY_ID[skillId]?.domainId.startsWith('rw') ? 'rw' : 'math', title: 'Practice', itemIds, durationSec: null }],
     };
@@ -37,7 +45,7 @@ export function PracticePage({ initialSkillId, onOpenProgress }: { initialSkillI
   };
 
   if (stage.kind === 'pick') return <SkillPicker length={length} setLength={setLength} onPick={(id) => setStage({ kind: 'lesson', skillId: id })} />;
-  if (stage.kind === 'lesson') return <LessonView skillId={stage.skillId} onStart={() => begin(stage.skillId)} onBack={() => setStage({ kind: 'pick' })} />;
+  if (stage.kind === 'lesson') return <LessonView skillId={stage.skillId} onStart={(ids, genNote) => begin(stage.skillId, ids, genNote)} onBack={() => setStage({ kind: 'pick' })} />;
   if (stage.kind === 'session') return <Session attemptId={stage.attemptId} note={stage.note} onDone={() => setStage({ kind: 'done', attemptId: stage.attemptId, skillId: stage.skillId })} />;
   return <SessionSummary attemptId={stage.attemptId} skillId={stage.skillId} onAgain={() => setStage({ kind: 'pick' })} onProgress={onOpenProgress} />;
 }
@@ -71,7 +79,7 @@ function SkillPicker({ onPick, length, setLength }: { onPick(id: string): void; 
               <button key={s.id} className="pr-skill" onClick={() => onPick(s.id)}>
                 <strong>{s.studentName}</strong>
                 <span className="muted">{s.tests}</span>
-                <span className="badge">{itemsForSkill(s.id).length} questions{LESSON_BY_SKILL[s.id] ? ' · lesson' : ''}</span>
+                <span className="badge">{curatedForSkill(s.id).length} questions{LESSON_BY_SKILL[s.id] ? ' · lesson' : ''}</span>
               </button>
             ))}
           </div>
@@ -81,11 +89,51 @@ function SkillPicker({ onPick, length, setLength }: { onPick(id: string): void; 
   );
 }
 
-function LessonView({ skillId, onStart, onBack }: { skillId: string; onStart(): void; onBack(): void }) {
+const curatedForSkill = (skillId: string) => itemsForSkill(skillId).filter((i) => i.origin !== 'generated');
+const GEN_COUNT = 3;
+
+function LessonView({ skillId, onStart, onBack }: { skillId: string; onStart(generatedIds: string[], note?: string): void; onBack(): void }) {
   const lesson = LESSON_BY_SKILL[skillId];
   const skill = SKILL_BY_ID[skillId];
   const [showCheck, setShowCheck] = useState(false);
-  const count = itemsForSkill(skillId).length;
+  const count = curatedForSkill(skillId).length;
+  const provider = useAiProvider();
+  const unseen = useAppState((s) => {
+    const seen = new Set(s.observations.filter((o) => o.profileId === s.activeProfileId).map((o) => o.itemId));
+    return curatedForSkill(skillId).filter((i) => !seen.has(i.id)).length;
+  });
+  const [withGemma, setWithGemma] = useState(unseen < 6);
+  const [gen, setGen] = useState<{ running: boolean; progress?: GenerationProgress; error?: string } | null>(null);
+  const ctrl = useRef<AbortController | null>(null);
+  const useGemma = !!provider && withGemma;
+
+  const start = async () => {
+    if (!provider || !withGemma) { onStart([]); return; }
+    const c = new AbortController();
+    ctrl.current = c;
+    setGen({ running: true });
+    try {
+      const live = await readyProvider(provider);
+      const { items } = await generatePracticeItems(live, skillId, GEN_COUNT, { onProgress: (progress) => setGen({ running: true, progress }), signal: c.signal });
+      saveGenerated(items);
+      if (c.signal.aborted) { setGen(null); return; }
+      setGen(null);
+      onStart(items.map((i) => i.id), items.length < GEN_COUNT
+        ? `${GEN_COUNT - items.length} of Gemma's ${GEN_COUNT} questions didn't pass the checks and were left out.`
+        : undefined);
+    } catch (e) {
+      if (c.signal.aborted) { setGen(null); return; }
+      setGen({ running: false, error: errorText(e) });
+    } finally {
+      if (ctrl.current === c) ctrl.current = null;
+    }
+  };
+  const p = gen?.progress;
+  const progressText = !p ? 'Connecting to Gemma…'
+    : p.stage === 'writing' ? `Writing question ${p.index} of ${p.total}…`
+    : p.stage === 'checking' ? `Writing question ${p.index} of ${p.total}… checking…`
+    : p.stage === 'accepted' ? `Question ${p.index} of ${p.total} passed the checks.`
+    : `Question ${p.index} of ${p.total} didn't pass the checks and was discarded.`;
   return (
     <div className="stack pr-lesson">
       <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={onBack}>← All skills</button>
@@ -117,9 +165,25 @@ function LessonView({ skillId, onStart, onBack }: { skillId: string; onStart(): 
         )}
       </div>
       <div className="row">
-        <button className="btn btn-primary" onClick={onStart} disabled={count === 0}>Start practice</button>
-        {count === 0 ? <span className="muted">No questions available for this skill yet.</span> : null}
+        <button className="btn btn-primary" onClick={start} disabled={(count === 0 && !useGemma) || !!gen?.running}>Start practice</button>
+        {count === 0 && !useGemma ? <span className="muted">No questions available for this skill yet.</span> : null}
       </div>
+      {provider ? (
+        <div className="stack gen-opt">
+          <label className="row gen-check">
+            <input type="checkbox" checked={withGemma} disabled={!!gen?.running} onChange={(e: any) => setWithGemma(!!e.target.checked)} />
+            Add {GEN_COUNT} new questions written by Gemma
+          </label>
+          <p className="muted gen-note">Each one is checked by a second Gemma pass before you see it. They don't count toward your skill estimate.</p>
+          {gen?.running ? (
+            <div className="row" aria-live="polite">
+              <span className="ai-spin-row"><span className="ai-spinner" aria-hidden="true" />{progressText}</span>
+              <button className="btn ai-sm" onClick={() => ctrl.current?.abort()}>Cancel</button>
+            </div>
+          ) : null}
+          {gen?.error ? <p className="ai-bad" role="alert">Gemma couldn't write questions: {gen.error} Uncheck the box to practice with curated questions.</p> : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -164,6 +228,7 @@ function Session({ attemptId, note, onDone }: { attemptId: string; note?: string
       </div>
       {note ? <p className="badge">{note}</p> : null}
       <div className="pr-progress" role="progressbar" aria-valuemin={0} aria-valuemax={ids.length} aria-valuenow={idx + 1}><div style={{ width: `${((idx + 1) / ids.length) * 100}%` }} /></div>
+      {item.origin === 'generated' ? <p className="badge gen-badge">Written by Gemma · checked automatically · not reviewed by a teacher</p> : null}
       <div className="card">
         <ItemView item={item} response={resp} onChange={(p) => { if (!isChecked) patch(p); }} disabled={isChecked} reveal={isChecked} allowEliminate />
       </div>
@@ -212,7 +277,9 @@ export function Explanation({ itemId, chosen }: { itemId: string; chosen?: Choic
       <p><strong>Check:</strong> {e.check}</p>
       {chosen && item.response.kind === 'mcq' && chosen !== item.response.answer && e.whyWrong?.[chosen] ? <p><strong>Why {chosen} doesn't work:</strong> {e.whyWrong[chosen]}</p> : null}
       <p><strong>Takeaway:</strong> {e.takeaway}</p>
-      <p className="muted pr-status">Answer source: original question key · explanation checked by automated review</p>
+      <p className="muted pr-status">{item.origin === 'generated'
+        ? 'Answer key written by Gemma and confirmed by an independent Gemma check'
+        : 'Answer source: original question key · explanation checked by automated review'}</p>
     </div>
   );
 }

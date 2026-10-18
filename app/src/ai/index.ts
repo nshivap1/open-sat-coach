@@ -5,3 +5,6 @@ export * from './client';
 export * from './coach';
 export * from './benchmark';
 export * from './catalog';
+export * from './download';
+export * from './generate';
+export * from './judge';

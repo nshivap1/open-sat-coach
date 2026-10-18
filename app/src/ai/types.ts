@@ -80,6 +80,7 @@ export interface BenchmarkSummary {
   p50Ms: number;
   p95Ms: number;
   classifyAccuracy?: number; // predicted skill == item skill
+  explanationPassRate?: number; // share of model explanations the judge passed (when judged)
   device?: string;
 }
 
@@ -95,11 +96,81 @@ export interface DownloadOption {
   sizeNote?: string;
 }
 
+// ---- Gemma inside the app (desktop): one-click download + bundled llama.cpp runtime ----
+export interface GemmaFile {
+  id: 'e2b' | 'e4b' | '12b';
+  label: string;             // 'Gemma 4 E4B'
+  fileName: string;          // 'gemma-4-E4B-it-Q4_0.gguf'
+  url: string;               // https://huggingface.co/ggml-org/.../resolve/main/<fileName>
+  sizeBytes: number;
+  sha256: string;
+  minMemoryGiB: number;      // recommended minimum RAM
+  note: string;              // one line for the picker
+}
+
+export interface DownloadProgress {
+  fileName: string;
+  receivedBytes: number;
+  totalBytes: number;
+  bytesPerSec: number;
+  stage: 'downloading' | 'verifying' | 'done' | 'error' | 'cancelled';
+  error?: string;
+}
+
+// ---- Gemma features ----
+export interface PastedQuestionReply {
+  skillId: string | null;    // one of SKILLS ids, or null if unsure
+  answer: string | null;     // the coach's proposed answer (letter or value), provisional
+  text: string;              // short explanation
+  steps: string[];
+  check?: string;
+  takeaway?: string;
+  ms: number;
+  status: 'unverified';
+}
+
+export interface MissSuggestion { reason: import('../domain/types').MissReason; why: string; ms: number }
+
+export interface GenerationProgress {
+  index: number;             // 1-based question being produced
+  total: number;
+  stage: 'writing' | 'checking' | 'accepted' | 'rejected';
+  note?: string;
+}
+
+// ---- AI judge: a separate, skeptical pass that checks answers and reasoning before the student sees them ----
+export interface JudgeVerdict {
+  verdict: 'pass' | 'fail' | 'uncertain';
+  answerCorrect: boolean | null;   // final answer matches the key (or, without a key, the judge's own independent answer); null if unknown
+  reasoningSound: boolean;         // every step follows; no contradictions with the key
+  grounded: boolean;               // R&W: claims supported by quoted passage text, no outside facts; Math: computations check out
+  judgeAnswer: string | null;      // the judge's own answer, worked out before reading the explanation
+  issues: string[];                // specific problems in plain language (empty on pass)
+  judgeLabel: string;              // e.g. 'Gemma 4 12B · separate judge' or 'Same model · second pass'
+  sameModel: boolean;              // true when the judge is the coach model (a critique, not independent proof)
+  ms: number;
+}
+
+export interface JudgedReply<T> {
+  reply: T;
+  verdict: JudgeVerdict | null;    // null when the judge is turned off or could not run
+  attempts: number;                // producer calls made (1 + repairs)
+  repaired: boolean;               // the shown reply is a revision prompted by the judge
+  judgeError?: string;             // the judge failed to run (the reply is shown as unchecked)
+}
+
+export interface JudgeSettings {
+  enabled: boolean;                // default true when a model is connected
+  autoRepair: boolean;             // default true: one revision when the judge fails a reply
+  provider?: ProviderConfig;       // a different local model to judge with; undefined = same as the coach
+}
+
 export interface AiSettings {
   enabled: boolean;
   provider?: ProviderConfig;     // apiKey stripped before persisting
   lastDetection?: DetectionReport;
   lastBenchmark?: BenchmarkSummary;
+  judge?: JudgeSettings;
 }
 
 // ---- Desktop (Tauri) command contract — implemented in src-tauri/src/lib.rs ----
@@ -114,3 +185,9 @@ export interface AiSettings {
 //   invoke('llama_status') -> { running: boolean, port: number | null, modelPath: string | null }
 //   invoke('device_info') -> { os: string, arch: string, totalMemoryBytes: number | null, cpu: string | null }
 //   invoke('open_external', { url: string }) -> void  (https only)
+//   invoke('download_model', { url: string, fileName: string, sha256: string, sizeBytes: number }) -> { path: string }
+//        only https://huggingface.co/... URLs; saves to <app data>/models/<fileName>; resumable (.part); verifies size + SHA-256;
+//        emits Tauri event 'model-download' with DownloadProgress about twice a second
+//   invoke('cancel_download') -> void
+//   invoke('list_app_models') -> GgufFile[]           (files in <app data>/models)
+//   invoke('delete_model', { fileName: string }) -> void

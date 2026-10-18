@@ -1,8 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { runBenchmark, isDesktop, invokeDesktop } from '../../ai';
-import type { BenchmarkSummary } from '../../ai/types';
-import { ITEMS } from '../../content';
-import { useAiProvider, useAiSettings, readyProvider, saveBenchmark, errorText } from './aiState';
+import type { BenchmarkSummary, ProviderConfig } from '../../ai/types';
+import { ITEMS as ALL_ITEMS } from '../../content';
+
+// Only the app's original questions: never grade Gemma against keys it wrote itself.
+const benchItems = () => ALL_ITEMS.filter((i) => i.origin !== 'generated');
+import { useAiProvider, useAiSettings, readyProvider, readyJudge, saveBenchmark, errorText } from './aiState';
 import './ai.css';
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -12,6 +15,8 @@ export function BenchmarkPanel() {
   const last = useAiSettings()?.lastBenchmark;
   const [limit, setLimit] = useState('10');
   const [classify, setClassify] = useState(false);
+  const [judgeExplanations, setJudgeExplanations] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const ctrl = useRef<AbortController | null>(null);
@@ -24,7 +29,8 @@ export function BenchmarkPanel() {
   const start = async () => {
     const c = new AbortController();
     ctrl.current = c;
-    setError(null);
+    setError(null); setNote(null);
+    const ITEMS = benchItems();
     const n = limit === 'all' ? ITEMS.length : Number(limit);
     setProgress({ done: 0, total: n });
     try {
@@ -36,13 +42,21 @@ export function BenchmarkPanel() {
         } catch { device = undefined; }
       }
       const live = await readyProvider(provider);
-      const res = await runBenchmark(live, ITEMS, {
+      let judge: ProviderConfig | undefined;
+      if (judgeExplanations) {
+        const j = await readyJudge(live);
+        if (j.provider) judge = j.provider;
+        else setNote('The judge is turned off in "Answer checking", so explanations were not graded.');
+      }
+      const opts: Parameters<typeof runBenchmark>[2] & { judgeExplanations?: boolean; judge?: ProviderConfig } = {
         limit: limit === 'all' ? undefined : n,
         classify,
         signal: c.signal,
         device,
-        onProgress: (done, total) => { if (!c.signal.aborted) setProgress({ done, total }); },
-      });
+        onProgress: (done: number, total: number) => { if (!c.signal.aborted) setProgress({ done, total }); },
+        ...(judge ? { judgeExplanations: true, judge } : {}),
+      };
+      const res = await runBenchmark(live, ITEMS, opts);
       if (c.signal.aborted) return;
       const { rows: _rows, ...summary } = res;
       saveBenchmark(summary);
@@ -63,9 +77,10 @@ export function BenchmarkPanel() {
       <div className="row">
         <label htmlFor={limitId}>Questions</label>
         <select id={limitId} className="input" value={limit} disabled={running} onChange={(e: any) => setLimit(e.target.value)}>
-          <option value="10">10</option><option value="30">30</option><option value="all">All ({ITEMS.length})</option>
+          <option value="10">10</option><option value="30">30</option><option value="all">All ({benchItems().length})</option>
         </select>
         <label className="row ai-gap-s"><input type="checkbox" checked={classify} disabled={running} onChange={(e: any) => setClassify(e.target.checked)} /> Also check skill classification</label>
+        <label className="row ai-gap-s"><input type="checkbox" checked={judgeExplanations} disabled={running} onChange={(e: any) => setJudgeExplanations(e.target.checked)} /> Also have the judge grade 5 explanations</label>
       </div>
       <div className="row">
         {!running
@@ -80,6 +95,7 @@ export function BenchmarkPanel() {
           </div>
         ) : null}
         {error && !running ? <p className="ai-m0 ai-bad">✗ {error}</p> : null}
+        {note && !running ? <p className="ai-m0 muted ai-small">{note}</p> : null}
       </div>
       {last && !running ? <BenchResult s={last} /> : null}
     </div>
@@ -97,6 +113,7 @@ function BenchResult({ s }: { s: BenchmarkSummary }) {
         <div><dt>Slow answers</dt><dd>{(s.p95Ms / 1000).toFixed(1)} s</dd><dd className="muted ai-small">p95</dd></div>
         {s.classifyAccuracy != null ? <div><dt>Skill classification</dt><dd>{pct(s.classifyAccuracy)}</dd><dd className="muted ai-small">matched the question's skill</dd></div> : null}
       </dl>
+      {s.explanationPassRate != null ? <p className="ai-m0 jd-bench"><strong>Explanations passed by the judge: {pct(s.explanationPassRate)}</strong></p> : null}
     </div>
   );
 }

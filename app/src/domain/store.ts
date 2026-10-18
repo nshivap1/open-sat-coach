@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { AppState } from './types';
+import { loadGeneratedFromState } from '../content/registry';
 
 // Tiny persisted store. Web build: localStorage (wrapped; falls back to memory).
 // Desktop build: replace load/save with the SQLite repository behind the same API.
@@ -31,6 +32,13 @@ function load(): AppState {
 }
 
 let state: AppState = load();
+registerGenerated(state);
+
+// Gemma-written practice items (FR-10) live in state; make them resolvable by id.
+function registerGenerated(s: AppState) {
+  try { loadGeneratedFromState(s.generatedItems ?? []); } catch (e) { console.error('Could not load generated questions', e); }
+}
+
 const listeners = new Set<() => void>();
 
 // Desktop (Tauri): state lives in SQLite behind the `load_state` / `save_state` commands.
@@ -46,7 +54,7 @@ export async function initStore(): Promise<void> {
   if (!invoke) return;
   try {
     const raw = (await invoke('load_state')) as string | null;
-    if (raw) state = { ...emptyState(), ...JSON.parse(raw) } as AppState;
+    if (raw) { state = { ...emptyState(), ...JSON.parse(raw) } as AppState; registerGenerated(state); }
     else if (state.profiles.length) await invoke('save_state', { json: JSON.stringify(stripSecrets(state)) });
   } catch (e) {
     console.error('Could not load saved data', e);

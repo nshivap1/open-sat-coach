@@ -173,6 +173,7 @@ export interface Observation {
   at: number;
   attemptId: string;
   mode: AttemptMode;
+  origin?: ItemOrigin;        // 'generated' observations never count as skill evidence (FR-10)
 }
 
 export type EvidenceLabel = 'insufficient' | 'needs_practice' | 'developing' | 'progressing' | 'consistent';
@@ -239,6 +240,7 @@ import type { AiSettings } from '../ai/types';
 export interface AppState {
   schemaVersion: 1;
   ai?: AiSettings;                                   // optional local model connection
+  generatedItems?: Item[];                           // Gemma-written practice items that passed validation (FR-10)
   profiles: Profile[];
   activeProfileId: string | null;
   attempts: Attempt[];

@@ -37,6 +37,7 @@ try {
     await page.getByRole('button', { name: /Check answer/ }).click();
     await page.getByRole('button', { name: /Explain it another way/ }).click();
     await page.getByText(/Mock coach/).waitFor();
+    await page.getByText(/Judge: answer and reasoning check out/).first().waitFor();
     await page.screenshot({ path: 'dist/e2e-ai-coach.png', fullPage: true });
   });
   await step('follow-up question', async () => {
@@ -45,12 +46,46 @@ try {
     await page.getByRole('button', { name: 'Ask', exact: true }).click();
     await page.getByText(/Why not a comma\?/).waitFor();
   });
+  await step('Gemma writes checked practice questions', async () => {
+    await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Practice', exact: true }).click();
+    await page.getByRole('button', { name: /Transitions/ }).first().click();
+    const box = page.getByLabel(/written by Gemma/i).first();
+    if (!(await box.isChecked())) await box.check();
+    await page.getByRole('button', { name: 'Start practice' }).click();
+    await page.getByText(/Written by Gemma/).first().waitFor({ timeout: 30000 });
+    await page.screenshot({ path: 'dist/e2e-ai-generated.png', fullPage: true });
+  });
   await step('benchmark in settings', async () => {
     await page.getByRole('button', { name: /Settings/ }).click();
     await page.getByRole('button', { name: /Run the check/ }).click();
     await page.getByText(/Accuracy/).first().waitFor({ timeout: 30000 });
     await page.waitForTimeout(1500);
     await page.screenshot({ path: 'dist/e2e-ai-bench.png', fullPage: true });
+  });
+  await step('ask the coach about a pasted question', async () => {
+    await page.getByRole('button', { name: 'Ask the coach' }).first().click();
+    await page.getByLabel(/Paste the question/).fill('Researchers tracked otters for three seasons ______ the data showed a clear pattern. Which choice completes the text? A) seasons, the B) seasons, and the C) seasons the D) seasons and, the');
+    await page.getByRole('button', { name: 'Ask', exact: true }).first().click();
+    await page.getByText(/Judge: answer and reasoning check out/).first().waitFor();
+    await page.screenshot({ path: 'dist/e2e-ai-ask.png', fullPage: true });
+  });
+  await step('miss-reason suggestion on results', async () => {
+    await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Tests', exact: true }).click();
+    await page.getByRole('button', { name: /^Start Quick diagnostic/ }).first().click();
+    for (let m = 0; m < 2; m++) {
+      await page.getByRole('button', { name: 'Start module' }).click();
+      await page.getByRole('button', { name: /Question 1 of/ }).click();
+      await page.getByRole('button', { name: /Go to review|Check your work/ }).first().click().catch(() => {});
+      await page.getByRole('button', { name: /Submit module/ }).first().click();
+      const yes = page.getByRole('button', { name: /Yes, submit/ }).first();
+      if (await yes.count()) await yes.click();
+      const resume = page.getByRole('button', { name: /Resume now/ });
+      if (m === 0 && await resume.count()) await resume.click();
+    }
+    await page.locator('button.t-res-toggle').first().click();
+    await page.getByRole('button', { name: /Suggest why I missed it/ }).first().click();
+    await page.getByRole('button', { name: /Use this reason/ }).first().click();
+    await page.screenshot({ path: 'dist/e2e-ai-miss.png', fullPage: true });
   });
 } finally {
   console.log('page errors:', errors.length ? errors : 'none');

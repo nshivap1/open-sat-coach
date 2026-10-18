@@ -3,6 +3,7 @@ import type { Attempt, GradedResponse, MissReason, ResponseRecord } from '../../
 import { DOMAIN_BY_ID, ITEM_BY_ID, SKILL_BY_ID } from '../../content';
 import { ItemView } from './ItemView';
 import { CoachPanel } from '../ai/CoachPanel';
+import { MissReasonSuggest } from '../ai/MissReasonSuggest';
 import './test.css';
 
 const REASONS: MissReason[] = ['concept', 'misread', 'calculation', 'strategy', 'time', 'guessed', 'unsure'];
@@ -101,6 +102,7 @@ export function Results({ attempt, graded, missReasons, onSetMissReason, onPract
                               {reasonOf(g.itemId) === r ? '✓ ' : ''}{r}
                             </button>
                           ))}
+                          <MissReasonSuggest item={item} chosen={resp?.raw ?? null} activeMs={resp?.activeMs} onAccept={(r) => onSetMissReason(g.itemId, r)} />
                         </div>
                       )}
                     </div>

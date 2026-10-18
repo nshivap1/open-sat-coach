@@ -5,6 +5,7 @@
 
 mod device;
 mod llama;
+mod models;
 mod net;
 mod scan;
 mod storage;
@@ -25,6 +26,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .manage(storage::DbState::default())
         .manage(llama::LlamaState::default())
+        .manage(models::DownloadState::default())
         .invoke_handler(tauri::generate_handler![
             storage::load_state,
             storage::save_state,
@@ -33,6 +35,10 @@ pub fn run() {
             llama::start_llama,
             llama::stop_llama,
             llama::llama_status,
+            models::download_model,
+            models::cancel_download,
+            models::list_app_models,
+            models::delete_model,
             device::device_info,
             device::open_external,
         ])

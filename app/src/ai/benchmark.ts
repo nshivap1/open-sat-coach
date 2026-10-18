@@ -3,6 +3,8 @@ import type { BenchmarkResult, BenchmarkRow, ChatMessage, ProviderConfig } from 
 import { gradeItem } from '../domain/grading';
 import { SKILLS } from '../content/index';
 import { chat, ensureRunning } from './client';
+import { explainAnotherWay } from './coach';
+import { judgeExplanation, sameProvider } from './judge';
 
 const MCQ_SCHEMA: Record<string, unknown> = {
   type: 'object',
@@ -62,7 +64,7 @@ function extractAnswer(item: Item, json: unknown): { answer: string | null; erro
   return { answer: raw };
 }
 
-export async function runBenchmark(p: ProviderConfig, items: Item[], opts: { limit?: number; classify?: boolean; signal?: AbortSignal; onProgress?(done: number, total: number): void; device?: string } = {}): Promise<BenchmarkResult> {
+export async function runBenchmark(p: ProviderConfig, items: Item[], opts: { limit?: number; classify?: boolean; signal?: AbortSignal; onProgress?(done: number, total: number): void; device?: string; judgeExplanations?: boolean; judge?: ProviderConfig; judgeLimit?: number } = {}): Promise<BenchmarkResult> {
   const { signal } = opts;
   const list = opts.limit != null && opts.limit >= 0 ? items.slice(0, opts.limit) : items.slice();
   const provider = await ensureRunning(p);
@@ -131,6 +133,32 @@ export async function runBenchmark(p: ProviderConfig, items: Item[], opts: { lim
     opts.onProgress?.(rows.length, list.length);
   }
 
+  // Explanation quality: the coach explains the key for the first answered items; the judge checks each one.
+  let judged = 0;
+  let passed = 0;
+  if (opts.judgeExplanations && !signal?.aborted) {
+    const limit = Math.max(0, Math.floor(opts.judgeLimit ?? 5));
+    const judgeP = opts.judge ?? provider;
+    const sameModel = sameProvider(judgeP, provider) || sameProvider(judgeP, p);
+    const byId = new Map(list.map((i) => [i.id, i]));
+    for (const row of rows.filter((r) => r.answer !== null).slice(0, limit)) {
+      if (signal?.aborted) break;
+      const item = byId.get(row.itemId);
+      if (!item) continue;
+      const key = item.response.kind === 'mcq' ? item.response.answer : item.response.accepted[0];
+      try {
+        const reply = await explainAnotherWay(provider, item, key, signal);
+        const v = await judgeExplanation(judgeP, { item, keyAnswer: key, studentAnswer: key, explanation: { text: reply.text, steps: reply.steps, takeaway: reply.takeaway } }, {
+          signal, sameModel, judgeLabel: sameModel ? 'Same model · second pass' : `${judgeP.label} · separate judge`,
+        });
+        judged++;
+        if (v.verdict === 'pass') passed++;
+      } catch (e) {
+        if (isAbort(e, signal)) break;
+      }
+    }
+  }
+
   const answered = rows.filter((r) => r.answer !== null).length;
   const correct = rows.filter((r) => r.correct).length;
   const latencies = rows.map((r) => r.ms).filter((ms) => ms > 0) // calls that got a reply;
@@ -148,5 +176,6 @@ export async function runBenchmark(p: ProviderConfig, items: Item[], opts: { lim
   };
   if (opts.classify) result.classifyAccuracy = classified ? classifiedRight / classified : 0;
   if (opts.device) result.device = opts.device;
+  if (opts.judgeExplanations && judged > 0) result.explanationPassRate = passed / judged;
   return result;
 }

@@ -1,2 +1,5 @@
 /target/
 /gen/schemas
+# llama-server + its libraries, placed here by scripts/setup-*.{sh,ps1}; never committed.
+binaries/*
+!binaries/README.md

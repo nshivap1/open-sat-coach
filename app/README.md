@@ -19,22 +19,48 @@ This is an unsigned development build. The first time you open it, right-click t
 
 On Windows, run `powershell -ExecutionPolicy Bypass -File scripts\setup-windows.ps1`. You need the Microsoft C++ Build Tools installed first.
 
-## AI coach (optional, runs on your computer)
+## Gemma: the AI coach (optional, runs on your computer)
 
-The model is **not bundled**: Gemma 4 E4B is 4.59 GB, which is over GitHub's 2 GiB release-file limit. Instead, the app finds a model you already run locally. During onboarding, or later in Settings → AI coach, it checks for:
+**Easiest path (desktop app):** during onboarding, or later in Settings → AI coach, choose **Get Gemma for this app**.
+- The app downloads Gemma 4 from Hugging Face and suggests a size based on your computer's memory:
+
+  | Model | Download | Suggested for |
+  |---|---|---|
+  | E2B | 2.84 GB | 8 GB computers |
+  | E4B | 4.59 GB | 16 GB computers |
+  | 12B | 7.22 GB | 24 GB or more |
+
+- It checks the download against Hugging Face's published SHA-256 checksum, and an interrupted download picks up where it stopped.
+- It runs Gemma with the llama.cpp runtime that `scripts/setup-mac.sh` bundles into the app. Nothing else needs installing.
+- The weights aren't inside the installer, because they're larger than GitHub's 2 GiB release-file limit.
+
+**Or use what you already have.** The app also finds:
 
 | Source | Where it looks |
 |---|---|
-| Ollama | `http://127.0.0.1:11434` (for example after `ollama pull gemma4:e4b`) |
+| Ollama | `:11434`, for example after `ollama pull gemma4:e4b` |
 | LM Studio | local server on `:1234` |
 | llama.cpp server | `:8080` |
 | Jan | `:1337` |
 | Any OpenAI-compatible server | a local URL you enter |
-| A `.gguf` file (desktop app only) | Downloads, `~/models`, the LM Studio, Hugging Face and llama.cpp caches. The app runs it with `llama-server`, which you can install with `brew install llama.cpp`. |
+| A `.gguf` file on disk | Downloads, `~/models`, and the LM Studio, Hugging Face and llama.cpp caches |
 
-If it finds nothing, onboarding shows download links for Gemma and recommends a model size based on your computer's memory.
+**What Gemma does in the app:**
+- **Explain it another way.** Available after you answer, with up to 6 follow-up questions.
+- **Ask the coach.** Paste any SAT question. Gemma names the skill it tests, works it through, and links to practice for that skill.
+- **Suggest why I missed it.** On results, Gemma proposes a reason for each miss. It's a hypothesis you accept or dismiss.
+- **New practice questions written by Gemma.** Each one passes structure checks, an independent Gemma solve, and a uniqueness check before you see it. They're labeled as Gemma-written and don't count toward your skill estimates.
+- **Benchmark (Settings → AI coach).** Shows how accurately and quickly your model answers the original practice questions.
 
-The app only ever talks to addresses on your own computer. AI explanations are labeled "not verified" and never change answer keys or grades. Settings → AI coach also has a quick benchmark: it shows how accurately and quickly the connected model answers the original practice questions.
+**AI judge.** Every AI answer, explanation and Gemma-written question gets a separate, skeptical judging pass before you see it.
+- The judge works the problem out itself, then checks the final answer, each step, and the arithmetic.
+- For Reading and Writing, it checks that every claim is backed by the passage.
+- Contradicting the answer key always fails.
+- A failed reply is revised once. If it still fails, the AI explanation is hidden behind a warning.
+- On pasted questions, disagreement between the coach and the judge is shown as a conflict.
+- You can choose a different local model as the judge (Settings → AI coach → Answer checking), for example Gemma 4 12B judging E4B. Otherwise the same model takes a second look, and the app labels that honestly.
+
+The app only talks to addresses on your own computer; the one exception is the Gemma download you start yourself. AI output is labeled "not verified" and never changes answer keys or grades.
 
 ## Develop
 

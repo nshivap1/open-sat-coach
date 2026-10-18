@@ -29,6 +29,8 @@ Companion files: [SOURCE_REVIEW.md](SOURCE_REVIEW.md) (source inventory and seed
 | D-12 | **Gemma 4** family (E2B / E4B / 12B) is the model candidate set | Google lists Gemma 4 under Apache-2.0 [S6]; verify the selected artifact's license file and per-variant image support |
 | D-13 | A **form budget planner** allocates the eight official forms among Bluebook tests, in-app diagnostics, and practice | Stops students from burning fresh full tests on drills |
 | D-14 | **The model is not bundled (owner decision, Oct 18).** The app connects to any local installation (Ollama, LM Studio, a llama.cpp server, Jan, another OpenAI-compatible server on this machine, or a `.gguf` file it runs with llama-server) and onboarding links to Gemma downloads | Gemma 4 E4B Q4_0 is 4.59 GB, over GitHub's 2 GiB per-file release limit; AI stays optional, local, and loopback-only |
+| D-15 | **Gemma is built into the experience (owner request, Oct 18).** The desktop app downloads Gemma 4 itself (E2B 2.84 GB / E4B 4.59 GB / 12B 7.22 GB, Q4_0 from ggml-org on Hugging Face, SHA-256 verified, resumable) and runs it with a bundled llama.cpp runtime. Gemma powers "explain it another way", anchored follow-ups, Ask the coach for pasted questions, miss-reason suggestions, and validated generated practice | One install path with no third-party app; weights still stay out of the installer (D-14) |
+| D-16 | **AI judge (owner request, Oct 18).** Every AI answer, explanation and Gemma-written question passes a separate judging pass before it is shown, with temperature 0 and a skeptical grader prompt. The judge solves the problem itself first. It then checks the final answer, each reasoning step, the arithmetic, and that Reading and Writing claims are supported by the passage. Code also compares the stated answer with the key: contradicting the key always fails. A failed reply gets one revision; if it still fails, the AI text is hidden behind a warning. For pasted questions, coach/judge disagreement is shown as a conflict. A different local model can be chosen as the judge | Catches wrong answers and unsupported reasoning before a student relies on them. With the same model, this is labeled a second look, not proof (FR-09) |
 
 **Removed from v1.0:** digital-format rehearsal (v1 FR-02 P1), local adaptive routing and its 70% threshold, the "reserve at least two forms" rule (replaced by D-13), all human/teacher reviewer gates.
 
@@ -372,6 +374,13 @@ Pipeline: validate transcription and required assets → classify → solve with
 ### FR-10 — Generated quizzes
 
 **P0** validated math families; **P1** bounded R&W families; **P2** broader coverage. The app shows which skills support generation.
+
+**M1 implementation (D-15):** Gemma writes candidate items for any skill. Each candidate must pass every gate below before it is served. Gates:
+1. Schema and structure checks, plus deduplication against the bank.
+2. An independent Gemma solve, with no key, that matches the key.
+3. A Gemma uniqueness check: exactly one defensible answer.
+
+A candidate gets at most two repairs. Accepted items are labeled "Written by Gemma · checked automatically", stored locally, and **excluded from skill evidence**. Deterministic math templates (the P0 families) remain the path to items that count as evidence.
 
 **Required v1 families.** Math (answers derived deterministically by code; the model only words the item, then validation runs again):
 

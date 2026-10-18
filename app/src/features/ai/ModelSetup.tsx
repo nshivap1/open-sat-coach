@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { detectLocalModels, ping, GEMMA_DOWNLOADS, recommendedVariant, isDesktop, invokeDesktop, openExternal } from '../../ai';
 import type { DetectionReport, DetectedModel, DownloadOption, PingResult } from '../../ai/types';
+import { GetGemma } from './GetGemma';
 import { saveProvider, disableAi, saveDetection, useAiProvider, readyProvider, forgetRunning, localUrlError, errorText, formatBytes, SOURCE_NAMES } from './aiState';
 import './ai.css';
 
@@ -67,6 +68,8 @@ function Finder({ variant, onDone, onCancel }: { variant: 'onboarding' | 'settin
   const [rec, setRec] = useState<Variant>(null);
   const runId = useRef(0);
   const customId = useId();
+  const desktop = isDesktop();
+  const otherHeadingId = useId();
 
   const scan = async (custom?: string) => {
     const id = ++runId.current;
@@ -126,6 +129,10 @@ function Finder({ variant, onDone, onCancel }: { variant: 'onboarding' | 'settin
 
   return (
     <div className="stack ai-finder">
+      {desktop ? <GetGemma onConnected={onDone} /> : <p className="muted ai-small ai-m0">The desktop app can download Gemma for you.</p>}
+
+      {desktop ? <h3 id={otherHeadingId} className="ai-m0 ai-section-h">Or use an app you already have</h3> : null}
+
       <div aria-live="polite" className="ai-status">
         {scanning ? <p className="ai-m0 ai-spin-row"><span className="ai-spinner" aria-hidden="true" /> Looking for AI models on this computer…</p> : null}
         {!scanning && scanError ? <p className="ai-m0 ai-bad">✗ The search failed: {scanError}</p> : null}
@@ -174,7 +181,9 @@ function Finder({ variant, onDone, onCancel }: { variant: 'onboarding' | 'settin
 
       {!scanning && report && models.length === 0 ? (
         <div className="stack">
-          <p className="ai-m0">The coach uses a free AI model that runs entirely on your computer, and it isn't included with this app. Install one of the options below, start it, then choose “Check again”.</p>
+          <p className="ai-m0">{desktop
+            ? 'If you prefer, install one of these free apps instead, start it, then choose “Check again”.'
+            : 'The coach uses a free AI model that runs entirely on your computer, and it isn\'t included with this app. Install one of the options below, start it, then choose “Check again”.'}</p>
           {rec ? (
             <p className="ai-m0 ai-rec"><strong>Suggested for this computer:</strong> {rec.label} <span className="muted">({rec.why})</span></p>
           ) : null}

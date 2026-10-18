@@ -4,7 +4,7 @@ import { computeSkillEvidence } from '../../domain/evidence';
 import { rankSkills } from '../../domain/recommend';
 import { SKILL_BY_ID, TESTS } from '../../content';
 
-export function Home({ onPractice, onStartTest, onResume, onGo }: { onPractice(skillId: string): void; onStartTest(testId: string): void; onResume(attemptId: string): void; onGo(view: 'practice' | 'tests' | 'progress'): void }) {
+export function Home({ onPractice, onStartTest, onResume, onGo, onAsk }: { onPractice(skillId: string): void; onStartTest(testId: string): void; onResume(attemptId: string): void; onGo(view: 'practice' | 'tests' | 'progress'): void; onAsk(): void }) {
   const s = useAppState((x) => x);
   const profile = activeProfile(s);
   const now = Date.now();
@@ -57,6 +57,14 @@ export function Home({ onPractice, onStartTest, onResume, onGo }: { onPractice(s
             <div className="row"><button className="btn btn-primary" onClick={() => onPractice(recs[0].skillId)}>Start session</button><button className="btn" onClick={() => onGo('progress')}>Open skill map</button></div>
           </>
         ) : null}
+      </div>
+
+      <div className="card row" style={{ justifyContent: 'space-between' }}>
+        <div>
+          <strong>Stuck on a question from somewhere else?</strong>
+          <div className="muted">{s.ai?.provider ? `Paste it and ${s.ai.provider.label.includes('Gemma') || /gemma/i.test(s.ai.provider.model) ? 'Gemma' : 'your local model'} will walk you through it.` : 'Connect Gemma in Settings → AI coach, then paste any SAT question here.'}</div>
+        </div>
+        <button className="btn" onClick={onAsk}>Ask the coach</button>
       </div>
 
       {recs.length > 1 ? (
